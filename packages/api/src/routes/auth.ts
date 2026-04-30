@@ -57,6 +57,7 @@ authRouter.post('/register', async (req, res, next) => {
         email: body.email,
         name: body.name,
         passwordHash,
+        globalRole: body.globalRole || 'USER',
       },
     });
     const accessToken = await issueTokens(user.id, user.email, user.globalRole, res);

@@ -37,7 +37,7 @@ export function IndexPage() {
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-white">
-      <img src="/logo.png" alt="Sentinel Logo" className="w-16 h-16 mb-6 animate-pulse" />
+      <img src="/logo.png" alt="Sentinel Logo" className="w-20 h-14 mb-6 animate-pulse" />
       <div className="w-12 h-1 border-2 border-blue-600/20 bg-blue-600/10 rounded-full overflow-hidden">
         <div className="w-1/2 h-full bg-blue-600 animate-[loading_1s_ease-in-out_infinite]"></div>
       </div>

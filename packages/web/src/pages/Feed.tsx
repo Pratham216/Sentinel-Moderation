@@ -92,9 +92,12 @@ export function FeedPage() {
       {/* Feed List */}
       <div className="space-y-6 pb-20">
         {isLoading ? (
-          <div className="flex flex-col items-center justify-center py-20 gap-4">
-            <div className="h-10 w-10 border-4 border-blue-100 border-t-blue-600 rounded-full animate-spin"></div>
-            <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Hydrating Feed...</p>
+          <div className="flex flex-col items-center justify-center py-40 gap-6">
+            <img src="/logo.png" alt="Sentinel Logo" className="w-20 h-14 animate-pulse drop-shadow-sm" />
+            <div className="w-12 h-1 border-2 border-blue-600/20 bg-blue-600/10 rounded-full overflow-hidden">
+                <div className="w-1/2 h-full bg-blue-600 animate-[loading_1s_ease-in-out_infinite]"></div>
+            </div>
+            <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] animate-pulse">Hydrating Feed Stream</p>
           </div>
         ) : allPosts.length === 0 ? (
            <div className="bg-white rounded-3xl border border-slate-100 p-12 text-center space-y-4 shadow-sm">

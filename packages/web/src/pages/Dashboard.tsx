@@ -129,26 +129,30 @@ export function DashboardPage() {
         <StatCard
           icon="forum"
           label="Total Posts"
-          value={isLoading ? ".." : totalPostsCount.toLocaleString()}
+          value={totalPostsCount.toLocaleString()}
           colorClass="text-blue-600"
+          isLoading={isLoading}
         />
         <StatCard
           icon="flag"
           label="Flagged Content"
-          value={isLoading ? ".." : flaggedCount.toLocaleString()}
+          value={flaggedCount.toLocaleString()}
           colorClass="text-amber-600"
+          isLoading={isLoading}
         />
         <StatCard
           icon="delete_sweep"
           label="Removed Content"
-          value={isLoading ? ".." : removedCount.toLocaleString()}
+          value={removedCount.toLocaleString()}
           colorClass="text-rose-600"
+          isLoading={isLoading}
         />
         <StatCard
           icon="verified"
           label="Avg Trust Score"
-          value={isLoading ? ".." : `${(analytics?.avgTrustScore ?? 0).toFixed(1)}%`}
+          value={`${(analytics?.avgTrustScore ?? 0).toFixed(1)}%`}
           colorClass="text-emerald-600"
+          isLoading={isLoading}
         />
       </div>
 
@@ -341,7 +345,7 @@ export function DashboardPage() {
   );
 }
 
-function StatCard({ label, value, colorClass, icon }: any) {
+function StatCard({ label, value, colorClass, icon, isLoading }: any) {
   const getColors = (cls: string) => {
     if (cls === 'text-slate-900') return { bg: 'bg-slate-100', accent: 'bg-slate-600' };
     if (cls.includes('blue')) return { bg: 'bg-blue-50', accent: 'bg-blue-600' };
@@ -361,7 +365,11 @@ function StatCard({ label, value, colorClass, icon }: any) {
       <div className="flex justify-between items-start relative z-0">
         <div className="space-y-1.5 flex-1">
           <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">{label}</p>
-          <p className={`text-3xl font-black ${colorClass} tracking-tighter`}>{value}</p>
+          {isLoading ? (
+            <p className={`text-3xl font-black ${colorClass} tracking-tighter animate-pulse`}>...</p>
+          ) : (
+            <p className={`text-3xl font-black ${colorClass} tracking-tighter`}>{value}</p>
+          )}
         </div>
         <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${bg} shadow-inner shrink-0`}>
           <span className="material-symbols-outlined text-[20px]">{icon}</span>

@@ -28,8 +28,8 @@ export function LoginPage() {
 
   return (
     <div className="login-background flex flex-col min-h-screen items-center justify-center p-4">
-      <div className="mb-8 flex flex-col items-center">
-        <img src="/logo.png" alt="Sentinel Logo" className="w-16 h-16 mb-4 drop-shadow-2xl hover:scale-105 transition-transform" />
+      <div className="mb-6 flex flex-col items-center">
+        <img src="/logo.png" alt="Sentinel Logo" className="w-20 h-14 mb-2 drop-shadow-2xl hover:scale-105 transition-transform" />
         <h1 className="text-3xl font-black tracking-tight text-slate-900 font-outfit">Sentinel</h1>
       </div>
 
@@ -80,7 +80,7 @@ export function LoginPage() {
         </p>
       </div>
 
-      <footer className="w-full max-w-7xl mx-auto mt-8 pt-4 pb-4 border-t border-slate-100 flex flex-col md:flex-row justify-between items-center text-slate-400 text-xs font-bold uppercase tracking-widest shrink-0">
+      <footer className="w-full max-w-7xl mx-auto mt-16 pt-16 pb-2 border-t border-slate-100 flex flex-col md:flex-row justify-between items-center text-slate-400 text-xs font-bold uppercase tracking-widest shrink-0">
         <div className="flex items-center gap-3 mb-6 md:mb-0">
           <span className="font-black text-slate-900 text-sm tracking-tighter">Sentinel</span>
           <div className="h-4 w-px bg-slate-200"></div>

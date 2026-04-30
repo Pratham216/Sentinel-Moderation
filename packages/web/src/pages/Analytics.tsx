@@ -15,7 +15,7 @@ import {
 export function AnalyticsPage() {
   const { communityId = '' } = useParams();
 
-  const { data: analytics, isLoading } = useQuery({
+  const { data: analytics, isLoading, isFetching } = useQuery({
     queryKey: ['analytics', communityId],
     queryFn: async () => {
       const { data } = await api.get(`/communities/${communityId}/analytics?range=7d`);
@@ -24,9 +24,7 @@ export function AnalyticsPage() {
     enabled: !!communityId,
   });
 
-  const trendData = analytics?.activityTrends || [
-    { day: '...', ai: 0, manual: 0 },
-  ];
+  const trendData = analytics?.activityTrends || [];
 
   const fpr = analytics?.moderationAccuracy?.falsePositiveRate ?? 0;
   const precision = (1 - fpr) * 100;
@@ -46,7 +44,6 @@ export function AnalyticsPage() {
 
   return (
     <div className="p-6 w-full max-w-[1600px] mx-auto space-y-6 print:p-0">
-      {/* Print-only CSS */}
       <style>
         {`
           @media print {
@@ -65,7 +62,16 @@ export function AnalyticsPage() {
       {/* Header */}
       <div className="flex justify-between items-center mb-8 print:mb-12">
         <div>
-          <h2 className="text-2xl font-bold text-slate-900 font-outfit">Analytics Overview</h2>
+          <h2 className="text-2xl font-bold text-slate-900 font-outfit flex items-center gap-3">
+            Analytics Overview
+            {isFetching && !isLoading && (
+              <span className="flex gap-1">
+                <span className="w-1 h-1 rounded-full bg-blue-400 animate-bounce"></span>
+                <span className="w-1 h-1 rounded-full bg-blue-400 animate-bounce [animation-delay:0.2s]"></span>
+                <span className="w-1 h-1 rounded-full bg-blue-400 animate-bounce [animation-delay:0.4s]"></span>
+              </span>
+            )}
+          </h2>
           <p className="text-[10px] font-bold text-slate-400 mt-1 uppercase tracking-widest font-inter">
             Real-time performance metrics and content integrity data.
           </p>
@@ -109,25 +115,30 @@ export function AnalyticsPage() {
           
           <div className="flex-1 w-full">
             {isLoading ? (
-                <div className="h-full w-full flex items-center justify-center">
-                    <span className="text-2xl font-black text-slate-200 animate-pulse">..</span>
+                <div className="h-full w-full flex flex-col items-center justify-center gap-4">
+                    <div className="flex gap-2.5 items-center">
+                        <div className="w-3 h-3 rounded-full bg-blue-100 animate-pulse"></div>
+                        <div className="w-3 h-3 rounded-full bg-blue-200 animate-pulse delay-75"></div>
+                        <div className="w-3 h-3 rounded-full bg-blue-300 animate-pulse delay-150"></div>
+                    </div>
+                    <p className="text-[10px] font-black text-slate-300 uppercase tracking-widest animate-pulse">Synchronizing Trends...</p>
                 </div>
             ) : (
                 <ResponsiveContainer>
-                <AreaChart data={trendData}>
-                    <defs>
-                    <linearGradient id="colorAi" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#4f46e5" stopOpacity={0.1}/>
-                        <stop offset="95%" stopColor="#4f46e5" stopOpacity={0}/>
-                    </linearGradient>
-                    </defs>
-                    <XAxis dataKey="day" axisLine={false} tickLine={false} tick={{fontSize: 10, fill: '#94a3b8'}} dy={10} />
-                    <Tooltip 
-                        contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
-                    />
-                    <Area type="monotone" dataKey="ai" stroke="#4f46e5" strokeWidth={3} fillOpacity={1} fill="url(#colorAi)" />
-                    <Area type="monotone" dataKey="manual" stroke="#94a3b8" strokeWidth={2} strokeDasharray="5 5" fill="transparent" />
-                </AreaChart>
+                    <AreaChart data={trendData}>
+                        <defs>
+                        <linearGradient id="colorAi" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="5%" stopColor="#4f46e5" stopOpacity={0.1}/>
+                            <stop offset="95%" stopColor="#4f46e5" stopOpacity={0}/>
+                        </linearGradient>
+                        </defs>
+                        <XAxis dataKey="day" axisLine={false} tickLine={false} tick={{fontSize: 10, fill: '#94a3b8'}} dy={10} />
+                        <Tooltip 
+                            contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
+                        />
+                        <Area type="monotone" dataKey="ai" stroke="#4f46e5" strokeWidth={3} fillOpacity={1} fill="url(#colorAi)" />
+                        <Area type="monotone" dataKey="manual" stroke="#94a3b8" strokeWidth={2} strokeDasharray="5 5" fill="transparent" />
+                    </AreaChart>
                 </ResponsiveContainer>
             )}
           </div>
@@ -135,10 +146,10 @@ export function AnalyticsPage() {
 
         {/* Vertical Stats Stack */}
         <div className="lg:col-span-1 flex flex-col gap-4">
-            <StatCard icon="auto_awesome" label="AI ACTIONS" value={isLoading ? ".." : totalActions.toLocaleString()} colorClass="text-blue-600" />
-            <StatCard icon="sentiment_satisfied" label="COMMUNITY SENTIMENT" value={isLoading ? ".." : sentiment} colorClass="text-emerald-600" />
-            <StatCard icon="warning" label="FALSE POSITIVE RATE" value={isLoading ? ".." : `${(fpr * 100).toFixed(1)}%`} colorClass="text-rose-600" />
-            <StatCard icon="person_search" label="MANUAL AUDITS" value={isLoading ? ".." : manualAudits.toLocaleString()} colorClass="text-slate-900" />
+            <StatCard icon="auto_awesome" label="AI ACTIONS" value={isLoading ? "..." : totalActions.toLocaleString()} colorClass="text-blue-600" isLoading={isLoading} />
+            <StatCard icon="sentiment_satisfied" label="COMMUNITY SENTIMENT" value={isLoading ? "..." : sentiment} colorClass="text-emerald-600" isLoading={isLoading} />
+            <StatCard icon="warning" label="FALSE POSITIVE RATE" value={isLoading ? "..." : `${(fpr * 100).toFixed(1)}%`} colorClass="text-rose-600" isLoading={isLoading} />
+            <StatCard icon="person_search" label="MANUAL AUDITS" value={isLoading ? "..." : manualAudits.toLocaleString()} colorClass="text-slate-900" isLoading={isLoading} />
         </div>
       </div>
 
@@ -149,7 +160,10 @@ export function AnalyticsPage() {
             <h3 className="font-bold text-slate-900 text-lg mb-8 font-outfit">Accuracy Breakdown</h3>
             <div className="flex-1 flex flex-col items-center justify-center relative min-h-[280px]">
                 {isLoading ? (
-                    <div className="text-xl font-black text-slate-100 animate-pulse">..</div>
+                    <div className="flex flex-col items-center gap-4 animate-pulse">
+                        <div className="w-24 h-24 rounded-full border-8 border-slate-50 border-t-blue-100 animate-spin"></div>
+                        <p className="text-[10px] font-black text-slate-300 uppercase tracking-widest">Calculating Accuracy...</p>
+                    </div>
                 ) : (
                     <>
                     <div className="h-full w-full">
@@ -243,7 +257,7 @@ export function AnalyticsPage() {
   );
 }
 
-function StatCard({ label, value, colorClass, icon }: any) {
+function StatCard({ label, value, colorClass, icon, isLoading }: any) {
   const getColors = (cls: string) => {
     if (cls === 'text-slate-900') return { bg: 'bg-slate-100', accent: 'bg-slate-600' };
     if (cls.includes('blue')) return { bg: 'bg-blue-50', accent: 'bg-blue-600' };
@@ -263,7 +277,11 @@ function StatCard({ label, value, colorClass, icon }: any) {
       <div className="flex justify-between items-start relative z-0">
         <div className="space-y-1.5 flex-1">
           <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] font-inter">{label}</p>
-          <p className={`text-2xl font-black ${colorClass} tracking-tighter font-outfit`}>{value}</p>
+          {isLoading ? (
+            <p className={`text-2xl font-black ${colorClass} tracking-tighter font-outfit animate-pulse`}>...</p>
+          ) : (
+            <p className={`text-2xl font-black ${colorClass} tracking-tighter font-outfit`}>{value}</p>
+          )}
         </div>
         <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${bg} shadow-inner shrink-0`}>
           <span className="material-symbols-outlined text-base">{icon}</span>
