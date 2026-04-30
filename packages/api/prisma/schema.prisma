@@ -1,0 +1,247 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum GlobalRole {
+  USER
+  ADMIN
+}
+
+enum CommunityRole {
+  USER
+  MODERATOR
+  ADMIN
+}
+
+enum PostStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  FLAGGED
+}
+
+enum ModerationRecommendation {
+  APPROVE
+  FLAG
+  REJECT
+}
+
+enum ModerationActionType {
+  APPROVE
+  REJECT
+  FLAG
+  UNFLAG
+}
+
+model User {
+  id              String    @id @default(cuid())
+  email           String    @unique
+  name            String
+  avatarUrl       String?
+  passwordHash    String?
+  oauthProvider   String?
+  oauthId         String?
+  globalRole      GlobalRole @default(USER)
+  trustScore      Int       @default(100)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  communityMembers CommunityMember[]
+  posts            Post[]    @relation("PostAuthor")
+  moderationActions ModerationAction[]
+  trustEvents      TrustEvent[]
+  auditLogs        AuditLog[] @relation("AuditActor")
+  refreshTokens     RefreshToken[]
+  notifications     Notification[]
+  ownedCommunities  Community[] @relation("CommunityOwner")
+  likes            Like[]
+  comments         Comment[]
+  savedPosts       SavedPost[]
+
+  @@index([email])
+}
+
+model RefreshToken {
+  id        String   @id @default(cuid())
+  userId    String
+  tokenHash String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model Community {
+  id            String   @id @default(cuid())
+  slug          String   @unique
+  name          String
+  description   String?
+  rules         Json     @default("[]")
+  settings      Json     @default("{}")
+  webhookSecret String   @default(cuid())
+  ownerId       String
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  owner   User   @relation("CommunityOwner", fields: [ownerId], references: [id])
+  members CommunityMember[]
+  posts   Post[]
+
+  @@index([slug])
+}
+
+model CommunityMember {
+  userId      String
+  communityId String
+  role        CommunityRole @default(USER)
+  joinedAt    DateTime      @default(now())
+
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  community Community @relation(fields: [communityId], references: [id], onDelete: Cascade)
+
+  @@id([userId, communityId])
+  @@index([communityId])
+}
+
+model Post {
+  id              String     @id @default(cuid())
+  communityId     String
+  authorId        String
+  externalSource  String?
+  externalId      String?
+  text            String
+  mediaUrls       String[]   @default([])
+  status          PostStatus @default(PENDING)
+  createdAt       DateTime   @default(now())
+
+  community        Community         @relation(fields: [communityId], references: [id], onDelete: Cascade)
+  author           User              @relation("PostAuthor", fields: [authorId], references: [id])
+  moderationResult ModerationResult?
+  actions          ModerationAction[]
+  likes            Like[]
+  comments         Comment[]
+  savedBy          SavedPost[]
+
+  @@index([communityId, status, createdAt])
+  @@index([authorId])
+}
+
+model ModerationResult {
+  id              String                    @id @default(cuid())
+  postId          String                    @unique
+  provider        String
+  model           String
+  toxicity        Float
+  sentiment       Float
+  categories      Json
+  ruleViolations  Json
+  recommendation  ModerationRecommendation
+  reasoning       String
+  confidence      Float
+  latencyMs       Int
+  error           String?
+  createdAt       DateTime @default(now())
+
+  post Post @relation(fields: [postId], references: [id], onDelete: Cascade)
+}
+
+model ModerationAction {
+  id          String                 @id @default(cuid())
+  postId      String
+  moderatorId String
+  action      ModerationActionType
+  reason      String?
+  createdAt   DateTime @default(now())
+
+  post      Post @relation(fields: [postId], references: [id], onDelete: Cascade)
+  moderator User @relation(fields: [moderatorId], references: [id])
+
+  @@index([postId])
+  @@index([moderatorId])
+}
+
+model TrustEvent {
+  id        String   @id @default(cuid())
+  userId    String
+  delta     Int
+  reason    String
+  postId    String?
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+}
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  actorId    String
+  action     String
+  entityType String
+  entityId   String
+  metadata   Json?
+  createdAt  DateTime @default(now())
+
+  actor User @relation("AuditActor", fields: [actorId], references: [id])
+
+  @@index([actorId, createdAt])
+  @@index([entityType, entityId])
+}
+
+model Notification {
+  id        String   @id @default(cuid())
+  userId    String
+  type      String
+  payload   Json
+  readAt    DateTime?
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, readAt])
+}
+
+model Like {
+  id        String   @id @default(cuid())
+  userId    String
+  postId    String
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  post Post @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, postId])
+  @@index([postId])
+}
+
+model Comment {
+  id        String   @id @default(cuid())
+  userId    String
+  postId    String
+  text      String
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  post Post @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  @@index([postId])
+}
+
+model SavedPost {
+  id        String   @id @default(cuid())
+  userId    String
+  postId    String
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  post Post @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, postId])
+  @@index([userId])
+}

@@ -1,0 +1,56 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: nebula
+      POSTGRES_PASSWORD: nebula
+      POSTGRES_DB: nebula
+    ports:
+      - '5432:5432'
+    volumes:
+      - nebula_pg:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U nebula']
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    ports:
+      - '4000:4000'
+    environment:
+      DATABASE_URL: postgresql://nebula:nebula@postgres:5432/nebula?schema=public
+      PORT: 4000
+      NODE_ENV: production
+      WEB_ORIGIN: http://localhost:8080
+      JWT_SECRET: ${JWT_SECRET:-dev-jwt-secret-min-32-chars-long-ok}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:-dev-refresh-min-32-chars-long-ok}
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY}
+      OPENROUTER_MODEL: ${OPENROUTER_MODEL:-anthropic/claude-3.5-sonnet}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
+      GITHUB_CLIENT_ID: ${GITHUB_CLIENT_ID:-}
+      GITHUB_CLIENT_SECRET: ${GITHUB_CLIENT_SECRET:-}
+      OAUTH_CALLBACK_BASE: ${OAUTH_CALLBACK_BASE:-http://localhost:4000}
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile.web
+      args:
+        VITE_API_URL: http://localhost:4000
+    ports:
+      - '8080:8080'
+    environment:
+      VITE_API_URL: http://localhost:4000
+    depends_on:
+      - api
+
+volumes:
+  nebula_pg:
