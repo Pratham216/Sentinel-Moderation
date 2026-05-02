@@ -29,3 +29,4 @@ function loadEnv(): Env {
 }
 
 export const env = loadEnv();
+export const allowedOrigins = env.WEB_ORIGIN.split(',').map((o) => o.trim());

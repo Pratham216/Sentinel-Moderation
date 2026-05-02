@@ -5,7 +5,7 @@ import passport from 'passport';
 import { requireAuth, loadUser } from '../middleware/auth.js';
 import { prisma } from '../lib/prisma.js';
 import { signAccessToken, signRefreshToken, verifyRefreshToken } from '../lib/jwt.js';
-import { env } from '../config/env.js';
+import { env, allowedOrigins } from '../config/env.js';
 import { registerSchema, loginSchema } from '@nebula/shared';
 import { ZodError } from 'zod';
 
@@ -209,11 +209,11 @@ authRouter.get('/oauth/google', (req, res, next) => {
 
 authRouter.get(
   '/oauth/google/callback',
-  passport.authenticate('google', { failureRedirect: `${env.WEB_ORIGIN}/login?error=oauth` }),
+  passport.authenticate('google', { failureRedirect: `${allowedOrigins[0]}/login?error=oauth` }),
   async (req, res) => {
     const u = req.user as { id: string; email: string; globalRole: string };
     const accessToken = await issueTokens(u.id, u.email, u.globalRole, res);
-    res.redirect(`${env.WEB_ORIGIN}/oauth/callback?token=${encodeURIComponent(accessToken)}`);
+    res.redirect(`${allowedOrigins[0]}/oauth/callback?token=${encodeURIComponent(accessToken)}`);
   }
 );
 
@@ -226,10 +226,10 @@ authRouter.get('/oauth/github', (req, res, next) => {
 
 authRouter.get(
   '/oauth/github/callback',
-  passport.authenticate('github', { failureRedirect: `${env.WEB_ORIGIN}/login?error=oauth` }),
+  passport.authenticate('github', { failureRedirect: `${allowedOrigins[0]}/login?error=oauth` }),
   async (req, res) => {
     const u = req.user as { id: string; email: string; globalRole: string };
     const accessToken = await issueTokens(u.id, u.email, u.globalRole, res);
-    res.redirect(`${env.WEB_ORIGIN}/oauth/callback?token=${encodeURIComponent(accessToken)}`);
+    res.redirect(`${allowedOrigins[0]}/oauth/callback?token=${encodeURIComponent(accessToken)}`);
   }
 );

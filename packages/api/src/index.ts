@@ -5,7 +5,7 @@ import cookieParser from 'cookie-parser';
 import session from 'express-session';
 import passport from 'passport';
 import { createServer } from 'http';
-import { env } from './config/env.js';
+import { env, allowedOrigins } from './config/env.js';
 import { errorHandler } from './middleware/error.js';
 import { initSocket } from './realtime/socket.js';
 import { logger } from './lib/logger.js';
@@ -26,7 +26,15 @@ const app = express();
 
 app.use(
   cors({
-    origin: env.WEB_ORIGIN,
+    origin: (origin, callback) => {
+      // Allow requests with no origin (like mobile apps or curl requests)
+      if (!origin) return callback(null, true);
+      if (allowedOrigins.indexOf(origin) !== -1 || env.NODE_ENV === 'development') {
+        callback(null, true);
+      } else {
+        callback(new Error('Not allowed by CORS'));
+      }
+    },
     credentials: true,
   })
 );

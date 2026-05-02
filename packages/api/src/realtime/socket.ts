@@ -2,14 +2,14 @@ import type { Server as HttpServer } from 'http';
 import { Server, type Socket } from 'socket.io';
 import { verifyAccessToken } from '../lib/jwt.js';
 import { prisma } from '../lib/prisma.js';
-import { env } from '../config/env.js';
+import { env, allowedOrigins } from '../config/env.js';
 import { logger } from '../lib/logger.js';
 
 let io: Server | null = null;
 
 export function initSocket(httpServer: HttpServer): Server {
   io = new Server(httpServer, {
-    cors: { origin: env.WEB_ORIGIN, credentials: true },
+    cors: { origin: allowedOrigins, credentials: true },
   });
 
   io.use(async (socket: Socket, next) => {
