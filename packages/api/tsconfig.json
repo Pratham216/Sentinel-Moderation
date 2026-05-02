@@ -5,7 +5,11 @@
     "rootDir": "src",
     "noEmit": false,
     "module": "NodeNext",
-    "moduleResolution": "NodeNext"
+    "moduleResolution": "NodeNext",
+    "baseUrl": ".",
+    "paths": {
+      "@nebula/shared": ["../shared/dist/index.d.ts"]
+    }
   },
   "include": ["src/**/*"],
   "references": [

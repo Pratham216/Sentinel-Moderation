@@ -4,8 +4,11 @@
     "outDir": "dist",
     "rootDir": "src",
     "declaration": true,
+    "declarationMap": true,
     "noEmit": false,
-    "composite": true
+    "composite": true,
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext"
   },
   "include": ["src/**/*"]
 }
