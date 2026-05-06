@@ -3,34 +3,85 @@ import { useInfiniteQuery, useQueryClient, useQuery } from '@tanstack/react-quer
 import { api } from '@/lib/api';
 import { useState, useEffect, useRef } from 'react';
 import { CreatePostModal } from '@/components/post/CreatePostModal';
+import { useCommunitySocket } from '@/hooks/useCommunitySocket';
+import { getSocket } from '@/lib/socket';
+import { useAuthStore } from '@/store/auth';
 
 export function PostsPage() {
     const { communityId = '' } = useParams();
     const navigate = useNavigate();
     const queryClient = useQueryClient();
+    const { accessToken } = useAuthStore();
     
+    // Join community socket room
+    useCommunitySocket(communityId);
+
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
     const [sortBy, setSortBy] = useState('Recent');
+    const [statusFilter, setStatusFilter] = useState('all');
     const [page, setPage] = useState(1);
     const pageSize = 10;
     const [isSortOpen, setIsSortOpen] = useState(false);
+    const [isFilterOpen, setIsFilterOpen] = useState(false);
     const sortRef = useRef<HTMLDivElement>(null);
+    const filterRef = useRef<HTMLDivElement>(null);
 
-    // Close sort dropdown on outside click
+    // Close dropdowns on outside click
     useEffect(() => {
         function handleClickOutside(event: MouseEvent) {
             if (sortRef.current && !sortRef.current.contains(event.target as Node)) {
                 setIsSortOpen(false);
+            }
+            if (filterRef.current && !filterRef.current.contains(event.target as Node)) {
+                setIsFilterOpen(false);
             }
         }
         document.addEventListener("mousedown", handleClickOutside);
         return () => document.removeEventListener("mousedown", handleClickOutside);
     }, []);
 
+    // Listen for real-time status updates to avoid manual refresh
+    useEffect(() => {
+        if (!communityId || !accessToken) return;
+        const socket = getSocket(accessToken);
+
+        const handleUpdate = (data: { postId: string; status: string; result?: any }) => {
+            // Update the cache immediately for all post-related queries in this community
+            queryClient.setQueriesData({ queryKey: ['posts', communityId] }, (old: any) => {
+                if (!old) return old;
+                
+                const updatePosts = (posts: any[]) => 
+                    posts.map(p => p.id === data.postId ? { 
+                        ...p, 
+                        status: data.status,
+                        moderationResult: data.result ? {
+                            ...p.moderationResult,
+                            toxicity: data.result.toxicity,
+                            confidence: data.result.confidence,
+                            recommendation: data.result.recommendation
+                        } : p.moderationResult
+                    } : p);
+
+                if (Array.isArray(old)) return updatePosts(old);
+                if (old.posts) return { ...old, posts: updatePosts(old.posts) };
+                return old;
+            });
+
+            // Also trigger a background refetch to ensure all data (analytics, etc) is perfectly synced
+            queryClient.invalidateQueries({ queryKey: ['posts', communityId] });
+            queryClient.invalidateQueries({ queryKey: ['analytics', communityId] });
+        };
+
+        socket.on('moderation:update', handleUpdate);
+        return () => {
+            socket.off('moderation:update', handleUpdate);
+        };
+    }, [communityId, accessToken, queryClient]);
+
     const { data: postsData, isLoading: isPostsLoading } = useQuery({
-        queryKey: ['posts', communityId, 'all'],
+        queryKey: ['posts', communityId, statusFilter],
         queryFn: async () => {
-            const { data } = await api.get(`/communities/${communityId}/posts?limit=100`);
+            const { data } = await api.get(`/communities/${communityId}/posts?limit=100&status=${statusFilter}`);
             return data;
         },
         enabled: !!communityId,
@@ -47,7 +98,7 @@ export function PostsPage() {
 
     const allPosts = postsData?.posts || [];
     const totalCount = postsData?.totalCount ?? allPosts.length;
-    
+
     // Client-side sorting
     const sortedPosts = [...allPosts].sort((a: any, b: any) => {
         let diff = 0;
@@ -86,10 +137,33 @@ export function PostsPage() {
                     </p>
                 </div>
                 <div className="flex gap-3">
-                    <button className="flex items-center gap-2 px-5 py-2 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-50 transition-all shadow-sm">
-                        <span className="material-symbols-outlined text-[18px]">filter_list</span>
-                        Filters
-                    </button>
+                    <div className="relative" ref={filterRef}>
+                        <button 
+                            onClick={() => setIsFilterOpen(!isFilterOpen)}
+                            className={`flex items-center gap-2 px-5 py-2 border rounded-xl text-xs font-bold transition-all shadow-sm ${statusFilter !== 'all' ? 'bg-blue-50 border-blue-200 text-blue-600' : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'}`}
+                        >
+                            <span className="material-symbols-outlined text-[18px]">filter_list</span>
+                            {statusFilter === 'all' ? 'Filters' : statusFilter.toUpperCase()}
+                        </button>
+
+                        {isFilterOpen && (
+                            <div className="absolute top-[calc(100%+8px)] right-0 w-48 bg-white border border-slate-100 rounded-2xl shadow-2xl z-50 py-2 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200">
+                                {['all', 'APPROVED', 'FLAGGED', 'REJECTED'].map((status) => (
+                                    <button
+                                        key={status}
+                                        onClick={() => {
+                                            setStatusFilter(status);
+                                            setIsFilterOpen(false);
+                                            setPage(1);
+                                        }}
+                                        className={`w-full px-5 py-3 text-left text-[10px] font-black uppercase tracking-widest transition-colors ${statusFilter === status ? 'text-blue-600 bg-blue-50/50' : 'text-slate-500 hover:bg-slate-50'}`}
+                                    >
+                                        {status === 'all' ? 'All Content' : status}
+                                    </button>
+                                ))}
+                            </div>
+                        )}
+                    </div>
                     <button onClick={() => setIsCreateModalOpen(true)} className="flex items-center gap-2 px-5 py-2 bg-blue-600 text-white rounded-xl text-xs font-bold uppercase tracking-widest shadow-lg shadow-blue-600/20 hover:opacity-90 transition-all">
                         <span className="material-symbols-outlined text-[18px]">add</span>
                         Create Post
@@ -137,14 +211,14 @@ export function PostsPage() {
                     <div className="flex items-center gap-4">
                         <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest font-inter">Sort by:</span>
                         <div className="relative" ref={sortRef}>
-                            <button 
+                            <button
                                 onClick={() => setIsSortOpen(!isSortOpen)}
                                 className="flex items-center gap-3 px-5 py-2.5 bg-slate-50 hover:bg-slate-100 rounded-xl border border-slate-100 transition-all cursor-pointer group"
                             >
                                 <span className="text-[10px] font-black text-blue-600 uppercase tracking-widest font-inter">{sortBy}</span>
                                 <span className={`material-symbols-outlined text-[18px] text-blue-400 transition-transform duration-300 ${isSortOpen ? 'rotate-180' : ''}`}>expand_more</span>
                             </button>
-                            
+
                             {isSortOpen && (
                                 <div className="absolute top-[calc(100%+8px)] right-0 w-48 bg-white border border-slate-100 rounded-2xl shadow-2xl z-50 py-2 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200">
                                     {['Recent', 'Engagement', 'Score'].map((option) => (
@@ -165,7 +239,7 @@ export function PostsPage() {
                         </div>
                     </div>
                 </div>
-                
+
                 <div className="overflow-x-auto">
                     <table className="w-full text-left">
                         <thead>
@@ -219,18 +293,18 @@ export function PostsPage() {
                                     const avatarUrl = post.author?.avatarUrl || getEliteAvatar(authorName);
                                     const authorInitial = authorName.split(' ').pop()?.[0] || authorName[0];
                                     return (
-                                        <PostTableRow 
+                                        <PostTableRow
                                             key={post.id}
-                                            user={authorName} 
-                                            role={post.author?.trustScore > 80 ? 'Trusted' : 'Member'} 
+                                            user={authorName}
+                                            role={post.author?.trustScore > 80 ? 'Trusted' : 'Member'}
                                             avatarUrl={avatarUrl}
-                                            text={post.text} 
-                                            status={post.status} 
+                                            text={post.text}
+                                            status={post.status}
                                             aiScore={post.moderationResult ? Math.round((1 - post.moderationResult.toxicity) * 100) : null}
                                             likes={post._count?.likes || 0}
-                                            comments={post._count?.comments || 0} 
+                                            comments={post._count?.comments || 0}
                                             saves={post._count?.savedBy || 0}
-                                            index={authorInitial} 
+                                            index={authorInitial}
                                             onClick={() => navigate(`/c/${communityId}/posts/${post.id}/view`)}
                                         />
                                     );
@@ -252,15 +326,15 @@ export function PostsPage() {
                         Showing <span className="text-slate-900">{(page - 1) * pageSize + 1}-{Math.min(page * pageSize, sortedPosts.length)}</span> of <span className="text-slate-900">{sortedPosts.length}</span> contributions
                     </p>
                     <div className="flex gap-2">
-                        <button 
-                            onClick={() => setPage(p => Math.max(1, p - 1))} 
+                        <button
+                            onClick={() => setPage(p => Math.max(1, p - 1))}
                             disabled={page === 1}
                             className={`p-2 rounded-lg border border-slate-200 shadow-sm transition-colors ${page === 1 ? 'text-slate-300 cursor-not-allowed bg-slate-50' : 'text-slate-700 hover:bg-slate-50 bg-white'}`}
                         >
                             <span className="material-symbols-outlined text-[18px]">chevron_left</span>
                         </button>
                         <button className="px-4 py-1 rounded-lg bg-white border border-slate-200 text-xs font-bold text-slate-700 shadow-sm">{page}</button>
-                        <button 
+                        <button
                             onClick={() => setPage(p => Math.min(totalPages, p + 1))}
                             disabled={page === totalPages || totalPages === 0}
                             className={`p-2 rounded-lg border border-slate-200 shadow-sm transition-colors ${page === totalPages || totalPages === 0 ? 'text-slate-300 cursor-not-allowed bg-slate-50' : 'text-slate-700 hover:bg-slate-50 bg-white'}`}
@@ -278,36 +352,36 @@ export function PostsPage() {
 
 
 function StatCard({ label, value, colorClass, icon }: any) {
-  const getColors = (cls: string) => {
-    if (cls === 'text-slate-900') return { bg: 'bg-slate-100', accent: 'bg-slate-600' };
-    if (cls.includes('blue')) return { bg: 'bg-blue-50', accent: 'bg-blue-600' };
-    if (cls.includes('rose')) return { bg: 'bg-rose-50', accent: 'bg-rose-600' };
-    if (cls.includes('emerald')) return { bg: 'bg-emerald-50', accent: 'bg-emerald-600' };
-    if (cls.includes('amber')) return { bg: 'bg-amber-50', accent: 'bg-amber-600' };
-    return { bg: 'bg-slate-50', accent: 'bg-slate-400' };
-  };
+    const getColors = (cls: string) => {
+        if (cls === 'text-slate-900') return { bg: 'bg-slate-100', accent: 'bg-slate-600' };
+        if (cls.includes('blue')) return { bg: 'bg-blue-50', accent: 'bg-blue-600' };
+        if (cls.includes('rose')) return { bg: 'bg-rose-50', accent: 'bg-rose-600' };
+        if (cls.includes('emerald')) return { bg: 'bg-emerald-50', accent: 'bg-emerald-600' };
+        if (cls.includes('amber')) return { bg: 'bg-amber-50', accent: 'bg-amber-600' };
+        return { bg: 'bg-slate-50', accent: 'bg-slate-400' };
+    };
 
-  const { bg, accent } = getColors(colorClass);
+    const { bg, accent } = getColors(colorClass);
 
-  return (
-    <div className="p-7 bg-white border border-slate-200 rounded-[32px] shadow-sm relative overflow-hidden group hover:scale-[1.03] hover:shadow-xl hover:shadow-blue-500/5 transition-all duration-300 cursor-default">
-      {/* Shiny Effect Overlay */}
-      <div className="absolute -inset-x-full inset-y-0 skew-x-[-25deg] bg-gradient-to-r from-transparent via-white/40 to-transparent opacity-0 group-hover:animate-[shiny_1.5s_ease-in-out] pointer-events-none z-10"></div>
-      
-      <div className="flex justify-between items-start relative z-0">
-        <div className="space-y-1.5">
-          <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">{label}</p>
-          <p className={`text-3xl font-black ${colorClass} tracking-tighter`}>{value}</p>
+    return (
+        <div className="p-7 bg-white border border-slate-200 rounded-[32px] shadow-sm relative overflow-hidden group hover:scale-[1.03] hover:shadow-xl hover:shadow-blue-500/5 transition-all duration-300 cursor-default">
+            {/* Shiny Effect Overlay */}
+            <div className="absolute -inset-x-full inset-y-0 skew-x-[-25deg] bg-gradient-to-r from-transparent via-white/40 to-transparent opacity-0 group-hover:animate-[shiny_1.5s_ease-in-out] pointer-events-none z-10"></div>
+
+            <div className="flex justify-between items-start relative z-0">
+                <div className="space-y-1.5">
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">{label}</p>
+                    <p className={`text-3xl font-black ${colorClass} tracking-tighter`}>{value}</p>
+                </div>
+                <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${bg} shadow-inner`}>
+                    <span className="material-symbols-outlined text-[20px]">{icon}</span>
+                </div>
+            </div>
+
+            {/* Bottom accent glow - More Prominent */}
+            <div className={`absolute bottom-0 left-0 right-0 h-1.5 ${accent} opacity-20 group-hover:opacity-100 transition-all duration-300 shadow-[0_0_15px_rgba(0,0,0,0.1)] group-hover:shadow-[0_-4px_12px_rgba(0,0,0,0.1)]`}></div>
         </div>
-        <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${bg} shadow-inner`}>
-          <span className="material-symbols-outlined text-[20px]">{icon}</span>
-        </div>
-      </div>
-      
-      {/* Bottom accent glow - More Prominent */}
-      <div className={`absolute bottom-0 left-0 right-0 h-1.5 ${accent} opacity-20 group-hover:opacity-100 transition-all duration-300 shadow-[0_0_15px_rgba(0,0,0,0.1)] group-hover:shadow-[0_-4px_12px_rgba(0,0,0,0.1)]`}></div>
-    </div>
-  );
+    );
 }
 
 function PostTableRow({ user, role, text, status, aiScore, likes, comments, saves, index, avatarUrl, onClick }: any) {

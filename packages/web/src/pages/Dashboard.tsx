@@ -1,5 +1,5 @@
 import { useParams, useNavigate } from 'react-router-dom';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import { useCommunitySocket } from '@/hooks/useCommunitySocket';
@@ -41,10 +41,12 @@ export function DashboardPage() {
     document.body.removeChild(link);
   };
 
+  const [range, setRange] = useState('7d');
+
   const { data: analytics, isLoading: isAnalyticsLoading, isFetching } = useQuery({
-    queryKey: ['analytics', communityId],
+    queryKey: ['analytics', communityId, range],
     queryFn: async () => {
-      const { data } = await api.get(`/communities/${communityId}/analytics?range=7d`);
+      const { data } = await api.get(`/communities/${communityId}/analytics?range=${range}`);
       return data as {
         totalPosts: number;
         completedPosts: number;
@@ -173,6 +175,21 @@ export function DashboardPage() {
               </h3>
               <p className="text-xs text-slate-400 font-medium mt-1 font-inter">Real-time enforcement volume across all channels.</p>
             </div>
+            <div className="flex bg-slate-50 p-1 rounded-xl border border-slate-100 shrink-0">
+              {['7d', '14d', '21d', '28d'].map((r) => (
+                <button
+                  key={r}
+                  onClick={() => setRange(r)}
+                  className={`px-3 py-1.5 rounded-lg text-[10px] font-bold transition-all uppercase tracking-wider ${
+                    range === r 
+                      ? 'bg-white text-blue-600 shadow-sm' 
+                      : 'text-slate-400 hover:text-slate-600'
+                  }`}
+                >
+                  {r.replace('d', '')}
+                </button>
+              ))}
+            </div>
           </div>
           <div className="flex-1 flex items-end justify-between gap-4 px-2 min-h-0">
             {isLoading ? (
@@ -210,12 +227,21 @@ export function DashboardPage() {
               </div>
             )})}
           </div>
-          <div className="flex justify-between mt-8 text-[10px] text-slate-400 font-black uppercase tracking-[0.15em] px-2 font-inter">
-            {!isLoading && analytics?.volumeByDay?.map((v, i) => (
-               <span key={i} className={i === (analytics?.volumeByDay?.length || 1) - 1 ? 'text-blue-600' : ''}>
-                {new Date(v.day).toLocaleDateString(undefined, { weekday: 'short' })}
-               </span>
-            ))}
+          <div className="flex justify-between mt-8 text-[9px] text-slate-400 font-black uppercase tracking-[0.1em] px-2 font-inter">
+            {!isLoading && analytics?.volumeByDay?.map((v, i) => {
+               const dateObj = new Date(v.day);
+               const isToday = i === (analytics?.volumeByDay?.length || 1) - 1;
+               const dayName = dateObj.toLocaleDateString(undefined, { weekday: 'short' });
+               const dateNum = dateObj.getDate().toString().padStart(2, '0');
+               const monthNum = (dateObj.getMonth() + 1).toString().padStart(2, '0');
+               
+               return (
+                <div key={i} className={`flex flex-col items-center gap-0.5 flex-1 ${isToday ? 'text-blue-600' : ''}`}>
+                  <span className="font-bold">{dayName}</span>
+                  <span className="text-[7px] opacity-60 font-medium">{dateNum}/{monthNum}</span>
+                </div>
+               );
+            })}
           </div>
         </div>
 

@@ -28,11 +28,18 @@ postsRouter.get(
       const cursor = req.query.cursor as string | undefined;
       const limit = parseInt(req.query.limit as string) || 10;
 
-      const where = {
+      const where: any = {
         communityId: cid,
-        ...(status ? { status } : {}),
         ...(authorId ? { authorId } : {}),
       };
+
+      // Only apply status filter if it's not 'all'
+      if (status && (status as string) !== 'all') {
+        where.status = status;
+      } else if (!status) {
+        // Default to APPROVED for public feeds
+        where.status = PostStatus.APPROVED;
+      }
 
       const [posts, totalCount] = await Promise.all([
         prisma.post.findMany({
@@ -69,7 +76,7 @@ postsRouter.get(
         const nextItem = posts.pop();
         nextCursor = nextItem!.id;
       }
-      
+
       const postsWithState = posts.map(p => ({
         ...p,
         isLiked: p.likes.length > 0,
@@ -134,12 +141,12 @@ postsRouter.post('/posts/:postId/save', requireAuth, async (req: Request, res, n
     });
 
     if (existing) {
-      await prisma.savedPost.delete({ where: { id: existing.id } }).catch(() => {});
+      await prisma.savedPost.delete({ where: { id: existing.id } }).catch(() => { });
       res.json({ saved: false });
     } else {
       await prisma.savedPost.create({
         data: { userId, postId: pid },
-      }).catch(() => {});
+      }).catch(() => { });
       const post = await prisma.post.findUnique({ where: { id: pid } });
       if (post) emitToCommunity(post.communityId, 'post:updated', { postId: pid });
       res.json({ saved: true });
@@ -161,12 +168,12 @@ postsRouter.post('/posts/:postId/like', requireAuth, async (req: Request, res, n
     if (existing) {
       await prisma.like.delete({
         where: { id: existing.id },
-      }).catch(() => {}); // Ignore if already deleted
+      }).catch(() => { }); // Ignore if already deleted
       res.json({ liked: false });
     } else {
       await prisma.like.create({
         data: { userId, postId: pid },
-      }).catch(() => {});
+      }).catch(() => { });
       const post = await prisma.post.findUnique({ where: { id: pid } });
       if (post) emitToCommunity(post.communityId, 'post:updated', { postId: pid });
       res.json({ liked: true });

@@ -57,7 +57,11 @@ export function ModerationQueuePage() {
       const queueKey = ['posts', communityId, 'FLAGGED'];
       await qc.cancelQueries({ queryKey: queueKey });
       const prevPosts = qc.getQueryData(queueKey);
-      qc.setQueryData(queueKey, (old: any) => Array.isArray(old) ? old.filter((p: any) => p.id !== postId) : old);
+      qc.setQueryData(queueKey, (old: any) => {
+        // Ensure we are working with an array of posts
+        const postsArray = Array.isArray(old) ? old : (old?.posts || []);
+        return postsArray.filter((p: any) => p.id !== postId);
+      });
 
       // 2. Optimistic analytics update
       const analyticsKey = ['analytics', communityId];
@@ -88,7 +92,10 @@ export function ModerationQueuePage() {
     const queueKey = ['posts', communityId, 'FLAGGED'];
     const analyticsKey = ['analytics', communityId];
 
-    qc.setQueryData(queueKey, (old: any) => Array.isArray(old) ? old.filter((p: any) => !selected.has(p.id)) : old);
+    qc.setQueryData(queueKey, (old: any) => {
+      const postsArray = Array.isArray(old) ? old : (old?.posts || []);
+      return postsArray.filter((p: any) => !selected.has(p.id));
+    });
     qc.setQueryData(analyticsKey, (old: any) => ({
       ...old,
       completedPosts: (old?.completedPosts ?? 0) + count
@@ -102,14 +109,15 @@ export function ModerationQueuePage() {
     setSelected(new Set());
   };
 
-  const highRiskCount = posts?.filter(p => (p.moderationResult?.toxicity ?? 0) > 0.85).length ?? 0;
+  const postsArray = Array.isArray(posts) ? posts : [];
+  const highRiskCount = postsArray.filter(p => (p.moderationResult?.toxicity ?? 0) > 0.85).length;
   
-  const avgConfidence = posts?.length 
-    ? Math.round(posts.reduce((acc, p) => acc + (p.moderationResult?.confidence ?? 0.85), 0) / posts.length * 100)
+  const avgConfidence = postsArray.length 
+    ? Math.round(postsArray.reduce((acc, p) => acc + (p.moderationResult?.confidence ?? 0.85), 0) / postsArray.length * 100)
     : 0;
 
-  const paginatedPosts = posts?.slice((page - 1) * pageSize, page * pageSize) || [];
-  const totalPages = posts ? Math.ceil(posts.length / pageSize) : 1;
+  const paginatedPosts = postsArray.slice((page - 1) * pageSize, page * pageSize);
+  const totalPages = Math.ceil(postsArray.length / pageSize) || 1;
 
   const isRefreshing = isPostsLoading || isAnalyticsLoading;
 

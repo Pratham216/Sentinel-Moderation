@@ -1,9 +1,13 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useMutation } from '@tanstack/react-query';
 import { api } from '@/lib/api';
+import { toast } from 'sonner';
+import { getSocket } from '@/lib/socket';
+import { useAuthStore } from '@/store/auth';
 
 export function CreatePostModal({ onClose, communityId, queryClient }: any) {
     const [text, setText] = useState('');
+    const { accessToken } = useAuthStore();
 
     const mutation = useMutation({
         mutationFn: async (payload: { text: string }) => {
@@ -20,7 +24,7 @@ export function CreatePostModal({ onClose, communityId, queryClient }: any) {
                 text: newPost.text,
                 status: 'PENDING',
                 createdAt: new Date().toISOString(),
-                author: { name: 'You', trustScore: 100 }, // Placeholder for optimistic view
+                author: { name: 'You', trustScore: 100 }, 
                 likes: [],
                 savedBy: [],
                 _count: { likes: 0, comments: 0, savedBy: 0 }
@@ -30,8 +34,49 @@ export function CreatePostModal({ onClose, communityId, queryClient }: any) {
             
             return { previousPosts };
         },
+        onSuccess: (post) => {
+            const socket = getSocket(accessToken);
+            
+            // Show the analysis toast immediately
+            const toastId = toast.loading('Sentinel AI is analyzing your post...', {
+                description: 'This usually takes a few seconds.',
+            });
+
+            const onModerationUpdate = (data: { postId: string; status: string }) => {
+                if (data.postId === post.id) {
+                    socket.off('moderation:update', onModerationUpdate);
+                    
+                    if (data.status === 'APPROVED') {
+                        toast.success('Post Auto-Approved', {
+                            id: toastId,
+                            description: 'Content passed safety validation and is now live.',
+                        });
+                    } else if (data.status === 'FLAGGED') {
+                        toast.warning('Moved to Moderation Queue', {
+                            id: toastId,
+                            description: 'Post flagged for manual review due to borderline safety score.',
+                        });
+                    } else if (data.status === 'REJECTED') {
+                        toast.error('Post Auto-Rejected', {
+                            id: toastId,
+                            description: 'Content violated community safety policies and was removed.',
+                        });
+                    }
+                }
+            };
+
+            socket.on('moderation:update', onModerationUpdate);
+            
+            // Safety timeout: if after 15s we still have no update, just clear the loading toast
+            setTimeout(() => {
+                socket.off('moderation:update', onModerationUpdate);
+                // We only dismiss if it's still the loading toast (though sonner handles ID correctly)
+                toast.dismiss(toastId);
+            }, 15000);
+        },
         onError: (_err, _newPost, context: any) => {
             queryClient.setQueryData(['posts', communityId], context.previousPosts);
+            toast.error('Failed to create post');
         },
         onSettled: () => {
             queryClient.invalidateQueries({ queryKey: ['posts', communityId] });

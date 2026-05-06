@@ -54,7 +54,7 @@ async function applyTrustDelta(
   });
   const user = await tx.user.findUnique({ where: { id: userId } });
   if (user) {
-    const next = Math.max(0, Math.min(200, user.trustScore + delta));
+    const next = Math.max(0, Math.min(100, user.trustScore + delta));
     await tx.user.update({ where: { id: userId }, data: { trustScore: next } });
   }
 }
@@ -144,6 +144,11 @@ export async function runModeration(postId: string): Promise<void> {
   emitToCommunity(post.communityId, 'moderation:update', {
     postId: post.id,
     status,
+    result: {
+      toxicity: output.toxicity,
+      confidence: output.confidence,
+      recommendation: output.recommendation,
+    }
   });
 }
 

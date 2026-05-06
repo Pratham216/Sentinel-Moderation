@@ -9,7 +9,7 @@ export function useCommunitySocket(communityId: string | undefined) {
 
   useEffect(() => {
     if (!communityId || !accessToken) return;
-    const s = getSocket();
+    const s = getSocket(accessToken);
     s.emit('join:community', communityId);
 
     const onMod = () => {

@@ -60,7 +60,9 @@ api.interceptors.response.use(
         return api(originalRequest);
       } catch (refreshError) {
         processQueue(refreshError, null);
-        setAccessToken(null);
+        // Important: Clear the auth store so the UI can redirect to login
+        const { useAuthStore } = await import('@/store/auth');
+        useAuthStore.getState().clearAuth();
         return Promise.reject(refreshError);
       } finally {
         isRefreshing = false;

@@ -23,12 +23,17 @@ analyticsRouter.get(
       let since: Date;
       let days = 7;
 
+      const rangeMatch = range.match(/^(\d+)d$/);
+      if (rangeMatch) {
+        days = parseInt(rangeMatch[1], 10);
+      } else if (range === '1d') {
+        days = 1;
+      }
+
       if (range === '1d') {
         since = new Date();
         since.setHours(0, 0, 0, 0); 
-        days = 1;
       } else {
-        days = range === '30d' ? 30 : range === '90d' ? 90 : 7;
         since = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
       }
 
@@ -37,8 +42,25 @@ analyticsRouter.get(
         include: { moderationResult: true },
       });
 
+      // 1. Generate the full range of days to ensure continuous charts
+      const dateLabels: string[] = [];
+      for (let i = 0; i < days; i++) {
+        const d = new Date();
+        d.setDate(d.getDate() - (days - 1 - i));
+        dateLabels.push(d.toISOString().slice(0, 10));
+      }
+
+      // 2. Initialize metrics for all days in the range
       const volumeByDay: Record<string, number> = {};
       const toxicitySumByDay: Record<string, { sum: number; n: number }> = {};
+      const dailyManualActions: Record<string, number> = {};
+
+      for (const d of dateLabels) {
+        volumeByDay[d] = 0;
+        toxicitySumByDay[d] = { sum: 0, n: 0 };
+        dailyManualActions[d] = 0;
+      }
+
       const decisions: Record<string, number> = {
         APPROVED: 0,
         REJECTED: 0,
@@ -48,20 +70,16 @@ analyticsRouter.get(
 
       for (const p of posts) {
         const d = p.createdAt.toISOString().slice(0, 10);
-        volumeByDay[d] = (volumeByDay[d] || 0) + 1;
-        if (p.moderationResult) {
-          const t = toxicitySumByDay[d] || { sum: 0, n: 0 };
+        if (volumeByDay[d] !== undefined) {
+          volumeByDay[d] += 1;
+        }
+        if (p.moderationResult && toxicitySumByDay[d]) {
+          const t = toxicitySumByDay[d];
           t.sum += p.moderationResult.toxicity;
           t.n += 1;
-          toxicitySumByDay[d] = t;
         }
         decisions[p.status] = (decisions[p.status] || 0) + 1;
       }
-
-      const toxicityTrend = Object.entries(toxicitySumByDay).map(([day, v]) => ({
-        day,
-        avgToxicity: v.n ? v.sum / v.n : 0,
-      }));
 
       const modActions = await prisma.moderationAction.findMany({
         where: {
@@ -74,12 +92,13 @@ analyticsRouter.get(
         },
       });
 
-      const dailyManualActions: Record<string, number> = {};
       let falsePositives = 0;
       let overrides = 0;
       for (const a of modActions) {
         const d = a.createdAt.toISOString().slice(0, 10);
-        dailyManualActions[d] = (dailyManualActions[d] || 0) + 1;
+        if (dailyManualActions[d] !== undefined) {
+          dailyManualActions[d] += 1;
+        }
 
         const mr = a.post.moderationResult;
         if (!mr) continue;
@@ -134,26 +153,23 @@ analyticsRouter.get(
         ? withResult.reduce((acc, p) => acc + (p.moderationResult?.latencyMs || 0), 0) / withResult.length
         : 0;
 
-      const volumeByDaySorted = Object.entries(volumeByDay)
-        .map(([day, count]) => ({ day, count }))
-        .sort((a, b) => a.day.localeCompare(b.day));
+      // 3. Map initialized metrics back to the required sorted formats
+      const volumeByDaySorted = dateLabels.map((day) => ({
+        day,
+        count: volumeByDay[day] || 0,
+      }));
 
-      const toxicityTrendSorted = Object.entries(toxicitySumByDay)
-        .map(([day, v]) => ({
-          day,
-          avgToxicity: v.n ? v.sum / v.n : 0,
-        }))
-        .sort((a, b) => a.day.localeCompare(b.day));
+      const toxicityTrendSorted = dateLabels.map((day) => ({
+        day,
+        avgToxicity: toxicitySumByDay[day].n ? toxicitySumByDay[day].sum / toxicitySumByDay[day].n : 0,
+      }));
 
-      const activityTrendsSorted = Object.entries(volumeByDay)
-        .map(([day, count]) => ({
-          day: day.slice(5), // Short date MM-DD
-          ai: count,
-          manual: dailyManualActions[day] || 0,
-          fullDay: day,
-        }))
-        .sort((a, b) => a.fullDay.localeCompare(b.fullDay))
-        .map(({ fullDay, ...rest }) => rest);
+      const activityTrendsSorted = dateLabels.map((day) => ({
+        day: day.slice(5), // Short date MM-DD
+        ai: volumeByDay[day] || 0,
+        manual: dailyManualActions[day] || 0,
+      }));
+
 
       res.json({
         range: `${days}d`,
