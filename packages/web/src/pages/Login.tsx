@@ -84,7 +84,7 @@ export function LoginPage() {
         <div className="flex items-center gap-3 mb-6 md:mb-0">
           <span className="font-black text-slate-900 text-sm tracking-tighter">Sentinel</span>
           <div className="h-4 w-px bg-slate-200"></div>
-          <span>© 2024 Sentinel Systems Inc.</span>
+          <span>© 2026 Sentinel Systems Inc.</span>
         </div>
       </footer>
     </div>
