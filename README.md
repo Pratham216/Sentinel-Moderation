@@ -2,6 +2,8 @@
 
 ![Sentinel Banner](https://images.unsplash.com/photo-1550751827-4bd374c3f58b?w=1200&h=400&fit=crop)
 
+Live Demo : [Sentinel Moderation App](https://sentinel-moderation-web.vercel.app/)
+
 Sentinel is a high-fidelity, AI-powered moderation platform designed for elite community management. It combines advanced contextual analysis with a premium executive dashboard to provide real-time oversight and automated enforcement across digital ecosystems.
 
 ## ✨ Core Features
