@@ -4,6 +4,12 @@
 
 Live Demo : [Sentinel Moderation App](https://sentinel-moderation-web.vercel.app/)
 
+Admin Login Credentials :
+Email: admin@nebula.test
+Password: adminadmin
+
+
+
 Sentinel is a high-fidelity, AI-powered moderation platform designed for elite community management. It combines advanced contextual analysis with a premium executive dashboard to provide real-time oversight and automated enforcement across digital ecosystems.
 
 ## ✨ Core Features
